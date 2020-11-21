@@ -28,16 +28,11 @@
     "url": "https://github.com/christophedebatz/worldwind-react-globe"
   },
   "main": "dist/index.js",
-  "module": "dist/index.es.js",
-  "jsnext:main": "dist/index.es.js",
   "scripts": {
     "test": "cross-env CI=1 react-scripts test --env=jsdom",
     "test:watch": "react-scripts test --env=jsdom",
     "build": "rollup -c",
-    "start": "rollup -c -w",
-    "prepare": "npm run build",
-    "predeploy": "cd example && npm install && npm run build",
-    "deploy": "gh-pages -d example/build"
+    "start": "rollup -c -w"
   },
   "dependencies": {
     "mobx": "^4.8.0",
