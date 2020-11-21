@@ -2,9 +2,10 @@
 
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
-var React = require('react');
-var React__default = _interopDefault(React);
-var Canvas = _interopDefault(require('react-native-canvas'));
+var react = require('react');
+var react__default = _interopDefault(react);
+var _reactNative = _interopDefault(require('react-native'));
+var _reactNativeWebview = _interopDefault(require('react-native-webview'));
 
 var commonjsGlobal = typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -5198,6 +5199,1745 @@ if (process.env.NODE_ENV !== "production" &&
     });
 }
 
+var Bus_1 = createCommonjsModule(function (module, exports) {
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
+
+function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
+
+var Bus = function () {
+  function Bus(send) {
+    _classCallCheck(this, Bus);
+
+    this._paused = false;
+    this._messageListeners = {};
+    this._queue = [];
+    this._send = send;
+  }
+
+  _createClass(Bus, [{
+    key: "post",
+    value: function post(message) {
+      var _this = this;
+
+      return new Promise(function (resolve) {
+        _this._messageListeners[message.id] = resolve;
+
+        if (!_this._paused) {
+          _this._send(message);
+        } else {
+          _this._queue.push(message);
+        }
+      });
+    }
+  }, {
+    key: "handle",
+    value: function handle(message) {
+      var handler = this._messageListeners[message.id];
+
+      if (handler) {
+        handler(message);
+      } else {
+        console.warn('Received unexpected message', message);
+      }
+    }
+  }, {
+    key: "pause",
+    value: function pause() {
+      this._paused = true;
+    }
+  }, {
+    key: "resume",
+    value: function resume() {
+      this._paused = false;
+
+      this._send(this._queue);
+
+      this._queue = [];
+    }
+  }]);
+
+  return Bus;
+}();
+
+exports.default = Bus;
+});
+
+unwrapExports(Bus_1);
+
+var webviewBinders = createCommonjsModule(function (module, exports) {
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.webviewEvents = exports.webviewProperties = exports.webviewMethods = exports.webviewConstructor = exports.webviewTarget = exports.constructors = exports.WEBVIEW_TARGET = void 0;
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty(target, key, source[key]); }); } return target; }
+
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
+function _construct(Parent, args, Class) { if (typeof Reflect !== "undefined" && Reflect.construct) { _construct = Reflect.construct; } else { _construct = function _construct(Parent, args, Class) { var a = [null]; a.push.apply(a, args); var Constructor = Parent.bind.apply(Parent, a); var instance = new Constructor(); if (Class) _setPrototypeOf(instance, Class.prototype); return instance; }; } return _construct.apply(null, arguments); }
+
+function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
+
+var WEBVIEW_TARGET = '@@WEBVIEW_TARGET';
+exports.WEBVIEW_TARGET = WEBVIEW_TARGET;
+var constructors = {};
+exports.constructors = constructors;
+
+var webviewTarget = function webviewTarget(targetName) {
+  return function (target) {
+    target.prototype[WEBVIEW_TARGET] = targetName;
+  };
+};
+
+exports.webviewTarget = webviewTarget;
+
+var ID = function ID() {
+  return Math.random().toString(32).slice(2);
+};
+
+var SPECIAL_CONSTRUCTOR = {
+  ImageData: {
+    className: 'Uint8ClampedArray',
+    paramNum: 0
+  }
+};
+
+var webviewConstructor = function webviewConstructor(constructorName) {
+  return function (target) {
+    constructors[constructorName] = target;
+
+    target.constructLocally = function () {
+      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+        args[_key] = arguments[_key];
+      }
+
+      return _construct(target, args.concat([true]));
+    };
+
+    target.prototype.onConstruction = function () {
+      for (var _len2 = arguments.length, args = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+        args[_key2] = arguments[_key2];
+      }
+
+      if (SPECIAL_CONSTRUCTOR[constructorName] !== undefined) {
+        var _SPECIAL_CONSTRUCTOR$ = SPECIAL_CONSTRUCTOR[constructorName],
+            className = _SPECIAL_CONSTRUCTOR$.className,
+            paramNum = _SPECIAL_CONSTRUCTOR$.paramNum;
+        args[paramNum] = {
+          className: className,
+          classArgs: [args[paramNum]]
+        };
+      }
+
+      this[WEBVIEW_TARGET] = ID();
+      this.postMessage({
+        type: 'construct',
+        payload: {
+          constructor: constructorName,
+          id: this[WEBVIEW_TARGET],
+          args: args
+        }
+      });
+    };
+
+    target.prototype.toJSON = function () {
+      return {
+        __ref__: this[WEBVIEW_TARGET]
+      };
+    };
+  };
+};
+
+exports.webviewConstructor = webviewConstructor;
+
+var webviewMethods = function webviewMethods(methods) {
+  return function (target) {
+    var _loop = function _loop(method) {
+      target.prototype[method] = function () {
+        for (var _len3 = arguments.length, args = new Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
+          args[_key3] = arguments[_key3];
+        }
+
+        return this.postMessage({
+          type: 'exec',
+          payload: {
+            target: this[WEBVIEW_TARGET],
+            method: method,
+            args: args
+          }
+        });
+      };
+    };
+
+    for (var _iterator = methods, _isArray = Array.isArray(_iterator), _i = 0, _iterator = _isArray ? _iterator : _iterator[typeof Symbol === "function" ? Symbol.iterator : "@@iterator"]();;) {
+      var _ref;
+
+      if (_isArray) {
+        if (_i >= _iterator.length) break;
+        _ref = _iterator[_i++];
+      } else {
+        _i = _iterator.next();
+        if (_i.done) break;
+        _ref = _i.value;
+      }
+
+      var method = _ref;
+
+      _loop(method);
+    }
+  };
+};
+
+exports.webviewMethods = webviewMethods;
+
+var webviewProperties = function webviewProperties(properties) {
+  return function (target) {
+    var _loop2 = function _loop2(key) {
+      var initialValue = properties[key];
+      var privateKey = "__" + key + "__";
+      target.prototype[privateKey] = initialValue;
+      Object.defineProperty(target.prototype, key, {
+        get: function get() {
+          return this[privateKey];
+        },
+        set: function set(value) {
+          this.postMessage({
+            type: 'set',
+            payload: {
+              target: this[WEBVIEW_TARGET],
+              key: key,
+              value: value
+            }
+          });
+
+          if (this.forceUpdate) {
+            this.forceUpdate();
+          }
+
+          return this[privateKey] = value;
+        }
+      });
+    };
+
+    var _arr = Object.keys(properties);
+
+    for (var _i2 = 0; _i2 < _arr.length; _i2++) {
+      var key = _arr[_i2];
+
+      _loop2(key);
+    }
+  };
+};
+
+exports.webviewProperties = webviewProperties;
+
+var webviewEvents = function webviewEvents(types) {
+  return function (target) {
+    var onConstruction = target.prototype.onConstruction;
+
+    target.prototype.onConstruction = function () {
+      if (onConstruction) {
+        onConstruction.call(this);
+      }
+
+      this.postMessage({
+        type: 'listen',
+        payload: {
+          types: types,
+          target: this[WEBVIEW_TARGET]
+        }
+      });
+    };
+
+    target.prototype.addEventListener = function (type, callback) {
+      var _this = this;
+
+      this.addMessageListener(function (message) {
+        if (message && message.type === 'event' && message.payload.target[WEBVIEW_TARGET] === _this[WEBVIEW_TARGET] && message.payload.type === type) {
+          for (var key in message.payload.target) {
+            var value = message.payload.target[key];
+
+            if (key in _this && _this[key] !== value) {
+              _this[key] = value;
+            }
+          }
+
+          callback(_objectSpread({}, message.payload, {
+            target: _this
+          }));
+        }
+      });
+    };
+  };
+};
+
+exports.webviewEvents = webviewEvents;
+});
+
+unwrapExports(webviewBinders);
+var webviewBinders_1 = webviewBinders.webviewEvents;
+var webviewBinders_2 = webviewBinders.webviewProperties;
+var webviewBinders_3 = webviewBinders.webviewMethods;
+var webviewBinders_4 = webviewBinders.webviewConstructor;
+var webviewBinders_5 = webviewBinders.webviewTarget;
+var webviewBinders_6 = webviewBinders.constructors;
+var webviewBinders_7 = webviewBinders.WEBVIEW_TARGET;
+
+var CanvasRenderingContext2D_1 = createCommonjsModule(function (module, exports) {
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+
+
+var _dec, _dec2, _dec3, _class;
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
+
+function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
+
+var CanvasRenderingContext2D = (_dec = (0, webviewBinders.webviewTarget)('context2D'), _dec2 = (0, webviewBinders.webviewProperties)({
+  fillStyle: '#000',
+  font: '10px sans-serif',
+  globalAlpha: 1.0,
+  globalCompositeOperation: 'source-over',
+  lineCap: 'butt',
+  lineDashOffset: 0.0,
+  lineJoin: 'miter',
+  lineWidth: 1.0,
+  miterLimit: 10.0,
+  shadowBlur: 0,
+  shadowColor: 'rgba(0,0,0,0)',
+  shadowOffsetX: 0,
+  shadowOffsetY: 0,
+  strokeStyle: '#000',
+  textAlign: 'start',
+  textBaseline: 'alphabetic'
+}), _dec3 = (0, webviewBinders.webviewMethods)(['arc', 'arcTo', 'beginPath', 'bezierCurveTo', 'clearRect', 'clip', 'closePath', 'createImageData', 'createLinearGradient', 'createPattern', 'createRadialGradient', 'drawFocusIfNeeded', 'drawImage', 'drawWidgetAsOnScreen', 'drawWindow', 'fill', 'fillRect', 'fillText', 'getImageData', 'getLineDash', 'isPointInPath', 'isPointInStroke', 'lineTo', 'measureText', 'moveTo', 'putImageData', 'quadraticCurveTo', 'rect', 'restore', 'rotate', 'save', 'scale', 'setLineDash', 'setTransform', 'stroke', 'strokeRect', 'strokeText', 'transform', 'translate']), _dec(_class = _dec2(_class = _dec3(_class = function () {
+  function CanvasRenderingContext2D(canvas) {
+    _classCallCheck(this, CanvasRenderingContext2D);
+
+    this.canvas = canvas;
+  }
+
+  _createClass(CanvasRenderingContext2D, [{
+    key: "postMessage",
+    value: function postMessage(message) {
+      return this.canvas.postMessage(message);
+    }
+  }]);
+
+  return CanvasRenderingContext2D;
+}()) || _class) || _class) || _class);
+exports.default = CanvasRenderingContext2D;
+});
+
+unwrapExports(CanvasRenderingContext2D_1);
+
+var index_html = `<html><head>
+    <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scaleable=no" name="viewport">
+    <style>
+      html {
+        -ms-content-zooming: none;
+        -ms-touch-action: pan-x pan-y;
+      }
+      body {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      * {
+        user-select: none;
+        -ms-user-select: none;
+        -moz-user-select: none;
+        -webkit-user-select: none;
+      }
+    </style>
+  </head>
+  <body>
+    <script>(function () {
+  if (CanvasRenderingContext2D.useSVGMatrix === void 0) {
+    CanvasRenderingContext2D.useSVGMatrix = false;
+  }
+
+  CanvasRenderingContext2D.arrayToSVGMatrix = function (matrix) {
+    if (matrix instanceof SVGMatrix) {
+      return matrix;
+    } else if (matrix instanceof Array) {
+      var _matrix = document.createElementNS('http://www.w3.org/2000/svg', 'svg').createSVGMatrix();
+
+      _matrix.a = array[0];
+      _matrix.b = array[1];
+      _matrix.c = array[2];
+      _matrix.d = array[3];
+      _matrix.e = array[4];
+      _matrix.f = array[5];
+      return _matrix;
+    } else {
+      throw new Error('Matrix is not an Array');
+    }
+  };
+
+  CanvasRenderingContext2D.svgMatrixToArray = function (matrix) {
+    if (matrix instanceof Array) {
+      return matrix;
+    } else if (matrix instanceof SVGMatrix) {
+      return [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f];
+    } else {
+      throw new Error('Matrix is not a SVGMatrix');
+    }
+  };
+})();
+
+(function () {
+  var canvasRenderingContext2DPrototype = CanvasRenderingContext2D.prototype;
+  var HTMLCanvasElementPrototype = HTMLCanvasElement.prototype;
+
+  if (!('resetTransform' in canvasRenderingContext2DPrototype)) {
+    canvasRenderingContext2DPrototype.resetTransform = function () {
+      this.setTransform(1, 0, 0, 1, 0, 0);
+    };
+  }
+
+  if (!('currentTransform' in canvasRenderingContext2DPrototype)) {
+    if ('mozCurrentTransform' in canvasRenderingContext2DPrototype) {
+      Object.defineProperty(canvasRenderingContext2DPrototype, 'currentTransform', {
+        get: function () {
+          return this.mozCurrentTransform;
+        },
+        set: function (matrix) {
+          this.mozCurrentTransform = matrix;
+        },
+        enumerable: true,
+        configurable: true
+      });
+    } else {
+      var getContext = HTMLCanvasElementPrototype.getContext;
+
+      HTMLCanvasElementPrototype.getContext = function (contextType, contextAttributes) {
+        var context = getContext.call(this, contextType, contextAttributes);
+
+        switch (contextType) {
+          case '2d':
+            Object.defineProperties(context, {
+              '_transformStack': {
+                value: [],
+                configurable: true,
+                writable: true
+              },
+              '_transformMatrix': {
+                value: [1, 0, 0, 1, 0, 0],
+                configurable: true,
+                writable: true
+              }
+            });
+            break;
+        }
+
+        return context;
+      };
+
+      Object.defineProperty(canvasRenderingContext2DPrototype, 'currentTransform', {
+        get: function () {
+          return this._transformMatrix;
+        },
+        set: function (matrix) {
+          this._transformMatrix = matrix;
+          this.setTransform(matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]);
+        },
+        enumerable: true,
+        configurable: true
+      });
+      var translate = canvasRenderingContext2DPrototype.translate;
+
+      canvasRenderingContext2DPrototype.translate = function (x, y) {
+        var matrix = this._transformMatrix;
+        matrix[4] = matrix[0] * x + matrix[2] * y + matrix[4];
+        matrix[5] = matrix[1] * x + matrix[3] * y + matrix[5];
+        translate.call(this, x, y);
+      };
+
+      var scale = canvasRenderingContext2DPrototype.scale;
+
+      canvasRenderingContext2DPrototype.scale = function (x, y) {
+        var matrix = this._transformMatrix;
+        matrix[0] *= x;
+        matrix[1] *= x;
+        matrix[2] *= y;
+        matrix[3] *= y;
+        scale.call(this, x, y);
+      };
+
+      var rotate = canvasRenderingContext2DPrototype.rotate;
+
+      canvasRenderingContext2DPrototype.rotate = function (angle) {
+        var cosValue = Math.cos(angle);
+        var sinValue = Math.sin(angle);
+        var matrix = this._transformMatrix;
+        this._transformMatrix = [matrix[0] * cosValue + matrix[2] * sinValue, matrix[1] * cosValue + matrix[3] * sinValue, matrix[0] * -sinValue + matrix[2] * cosValue, matrix[1] * -sinValue + matrix[3] * cosValue, matrix[4], matrix[5]];
+        rotate.call(this, angle);
+      };
+
+      var transform = canvasRenderingContext2DPrototype.transform;
+
+      canvasRenderingContext2DPrototype.transform = function (a, b, c, d, e, f) {
+        var matrix = this._transformMatrix;
+        this._transformMatrix = [matrix[0] * a + matrix[2] * b, matrix[1] * a + matrix[3] * b, matrix[0] * c + matrix[2] * d, matrix[1] * c + matrix[3] * d, matrix[0] * e + matrix[2] * f + matrix[4], matrix[1] * e + matrix[3] * f + matrix[5]];
+        transform.call(this, a, b, c, d, e, f);
+      };
+
+      var setTransform = canvasRenderingContext2DPrototype.setTransform;
+
+      canvasRenderingContext2DPrototype.setTransform = function (a, b, c, d, e, f) {
+        this._transformMatrix = [a, b, c, d, e, f];
+        setTransform.call(this, a, b, c, d, e, f);
+      };
+
+      var resetTransform = canvasRenderingContext2DPrototype.resetTransform;
+
+      canvasRenderingContext2DPrototype.resetTransform = function () {
+        this._transformMatrix = [1, 0, 0, 1, 0, 0];
+        resetTransform.call(this);
+      };
+
+      var save = canvasRenderingContext2DPrototype.save;
+
+      canvasRenderingContext2DPrototype.save = function () {
+        this._transformStack.push(this._transformMatrix);
+
+        this._transformMatrix = this._transformMatrix.slice(0, 6);
+        save.call(this);
+      };
+
+      var restore = canvasRenderingContext2DPrototype.restore;
+
+      canvasRenderingContext2DPrototype.restore = function () {
+        var matrix = this._transformStack.pop();
+
+        if (matrix) {
+          this._transformMatrix = matrix;
+        }
+
+        restore.call(this);
+      };
+    }
+  }
+
+  var currentTransform = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'currentTransform');
+  var currentTransformIsSVGMatrix = document.createElement('canvas').getContext('2d').currentTransform instanceof SVGMatrix;
+  Object.defineProperty(canvasRenderingContext2DPrototype, 'currentTransform', {
+    get: function () {
+      var value = currentTransform.get.call(this);
+      return CanvasRenderingContext2D.useSVGMatrix ? CanvasRenderingContext2D.arrayToSVGMatrix(value) : CanvasRenderingContext2D.svgMatrixToArray(value);
+    },
+    set: function (matrix) {
+      currentTransform.set.call(this, currentTransformIsSVGMatrix ? CanvasRenderingContext2D.svgMatrixToArray(matrix) : CanvasRenderingContext2D.svgMatrixToArray(matrix));
+    },
+    enumerable: true,
+    configurable: true
+  });
+
+  if (!('imageSmoothingEnabled' in canvasRenderingContext2DPrototype)) {
+    Object.defineProperty(canvasRenderingContext2DPrototype, 'imageSmoothingEnabled', {
+      get: function () {
+        if (this.mozImageSmoothingEnabled !== void 0) {
+          return this.mozImageSmoothingEnabled;
+        } else if (this.webkitImageSmoothingEnabled !== void 0) {
+          return this.webkitImageSmoothingEnabled;
+        } else if (this.msImageSmoothingEnabled !== void 0) {
+          return this.msImageSmoothingEnabled;
+        } else {
+          return true;
+        }
+      },
+      set: function (enable) {
+        if (this.mozImageSmoothingEnabled !== void 0) {
+          this.mozImageSmoothingEnabled = enable;
+        } else if (this.webkitImageSmoothingEnabled !== void 0) {
+          this.webkitImageSmoothingEnabled = enable;
+        } else if (this.msImageSmoothingEnabled !== void 0) {
+          this.msImageSmoothingEnabled = enable;
+        }
+      },
+      enumerable: true,
+      configurable: true
+    });
+  }
+
+  if (!('ellipse' in canvasRenderingContext2DPrototype)) {
+    canvasRenderingContext2DPrototype.ellipse = function (x, y, radiusX, radiusY, rotation, startAngle, endAngle, antiClockwise) {
+      this.save();
+      this.translate(x, y);
+      this.rotate(rotation);
+      this.scale(radiusX, radiusY);
+      this.arc(0, 0, 1, startAngle, endAngle, antiClockwise);
+      this.restore();
+    };
+  }
+})();
+
+(function () {
+  if (!('Path2D' in window) || !('addPath' in window.Path2D.prototype)) {
+    var _Path2D = window.Path2D;
+
+    var Path2D = function (path2D) {
+      Object.defineProperty(this, '_operations', {
+        value: [],
+        configurable: true,
+        writable: true
+      });
+
+      if (path2D instanceof Path2D) {
+        if (path2D._original && _Path2D) {
+          Object.defineProperty(this, '_original', {
+            value: new _Path2D(path2D._original),
+            configurable: true,
+            writable: true
+          });
+          this._operations = path2D._operations.slice(0);
+        } else {
+          this.addPath(path2D);
+        }
+      } else if (_Path2D) {
+        Object.defineProperty(this, '_original', {
+          value: new _Path2D(path2D),
+          configurable: true,
+          writable: true
+        });
+      }
+    };
+
+    window.Path2D = Path2D;
+    var path2DPrototype = Path2D.prototype;
+    ['arc', 'arcTo', 'bezierCurveTo', 'closePath', 'ellipse', 'lineTo', 'moveTo', 'quadraticCurveTo', 'rect'].forEach(function (attributeName) {
+      path2DPrototype[attributeName] = function () {
+        this._operations.push({
+          type: attributeName,
+          arguments: Array.prototype.slice.call(arguments, 0)
+        });
+
+        if (this._original) _Path2D.prototype[attributeName].apply(this._original, arguments);
+      };
+    });
+    var canvasRenderingContext2DPrototype = CanvasRenderingContext2D.prototype;
+    ['fill', 'stroke', 'clip', 'isPointInPath', 'isPointInStroke'].forEach(function (attributeName) {
+      var original = canvasRenderingContext2DPrototype[attributeName];
+
+      canvasRenderingContext2DPrototype[attributeName] = function (path2D) {
+        if (path2D instanceof Path2D) {
+          if (path2D._original) {
+            return original.apply(this, [path2D._original].concat(Array.prototype.slice.call(arguments, 1)));
+          } else {
+            this.beginPath();
+            var operation;
+
+            for (var i = 0, l = path2D._operations.length; i < l; i++) {
+              operation = path2D._operations[i];
+              canvasRenderingContext2DPrototype[operation.type].apply(this, operation.arguments);
+            }
+
+            return original.apply(this, Array.prototype.slice.call(arguments, 1));
+          }
+        } else {
+          return original.apply(this, arguments);
+        }
+      };
+    });
+
+    if (!('addPath' in path2DPrototype)) {
+      path2DPrototype.addPath = function (path2D, transform) {
+        if (transform !== void 0) {
+          if (path2D._original) delete path2D._original;
+
+          this._operations.push({
+            type: 'save',
+            arguments: []
+          });
+
+          this._operations.push({
+            type: 'transform',
+            arguments: CanvasRenderingContext2D.svgMatrixToArray(transform)
+          });
+        }
+
+        var operation;
+
+        for (var i = 0, l = path2D._operations.length; i < l; i++) {
+          operation = path2D._operations[i];
+          path2DPrototype[operation.type].apply(this, operation.arguments);
+        }
+
+        if (transform !== void 0) {
+          this._operations.push({
+            type: 'restore',
+            arguments: []
+          });
+        }
+      };
+    }
+  }
+})();</script>
+    <script>var scale = function scale(ratio) {
+  return function (item) {
+    if (typeof item === 'number') {
+      return item * ratio;
+    }
+
+    return item;
+  };
+};
+
+window.autoScaleCanvas = function autoScaleCanvas(canvas) {
+  var ctx = canvas.getContext('2d');
+  var ratio = window.devicePixelRatio || 1;
+
+  if (ratio != 1) {
+    canvas.style.width = canvas.width + 'px';
+    canvas.style.height = canvas.height + 'px';
+    canvas.width *= ratio;
+    canvas.height *= ratio;
+    ctx.scale(ratio, ratio);
+
+    ctx.isPointInPath = function () {
+      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+        args[_key] = arguments[_key];
+      }
+
+      return CanvasRenderingContext2D.prototype.isPointInPath.apply(ctx, args.map(scale(ratio)));
+    };
+  }
+
+  return canvas;
+};</script>
+    <script>function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+    var ownKeys = Object.keys(source);
+
+    if (typeof Object.getOwnPropertySymbols === 'function') {
+      ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) {
+        return Object.getOwnPropertyDescriptor(source, sym).enumerable;
+      }));
+    }
+
+    ownKeys.forEach(function (key) {
+      _defineProperty(target, key, source[key]);
+    });
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
+
+function _construct(Parent, args, Class) {
+  if (typeof Reflect !== "undefined" && Reflect.construct) {
+    _construct = Reflect.construct;
+  } else {
+    _construct = function _construct(Parent, args, Class) {
+      var a = [null];
+      a.push.apply(a, args);
+      var Constructor = Parent.bind.apply(Parent, a);
+      var instance = new Constructor();
+      if (Class) _setPrototypeOf(instance, Class.prototype);
+      return instance;
+    };
+  }
+
+  return _construct.apply(null, arguments);
+}
+
+function _setPrototypeOf(o, p) {
+  _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) {
+    o.__proto__ = p;
+    return o;
+  };
+
+  return _setPrototypeOf(o, p);
+}
+
+function _toConsumableArray(arr) {
+  return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread();
+}
+
+function _nonIterableSpread() {
+  throw new TypeError("Invalid attempt to spread non-iterable instance");
+}
+
+function _iterableToArray(iter) {
+  if ((typeof Symbol === "function" ? Symbol.iterator : "@@iterator") in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter);
+}
+
+function _arrayWithoutHoles(arr) {
+  if (Array.isArray(arr)) {
+    for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) {
+      arr2[i] = arr[i];
+    }
+
+    return arr2;
+  }
+}
+
+function _classCallCheck(instance, Constructor) {
+  if (!(instance instanceof Constructor)) {
+    throw new TypeError("Cannot call a class as a function");
+  }
+}
+
+function _defineProperties(target, props) {
+  for (var i = 0; i < props.length; i++) {
+    var descriptor = props[i];
+    descriptor.enumerable = descriptor.enumerable || false;
+    descriptor.configurable = true;
+    if ("value" in descriptor) descriptor.writable = true;
+    Object.defineProperty(target, descriptor.key, descriptor);
+  }
+}
+
+function _createClass(Constructor, protoProps, staticProps) {
+  if (protoProps) _defineProperties(Constructor.prototype, protoProps);
+  if (staticProps) _defineProperties(Constructor, staticProps);
+  return Constructor;
+}
+
+var WEBVIEW_TARGET = '@@WEBVIEW_TARGET';
+
+var ID = function ID() {
+  return Math.random().toString(32).slice(2);
+};
+
+var flattenObjectCopyValue = function flattenObjectCopyValue(flatObj, srcObj, key) {
+  var value = srcObj[key];
+
+  if (typeof value === 'function') {
+    return;
+  }
+
+  if (typeof value === 'object' && value instanceof Node) {
+    return;
+  }
+
+  flatObj[key] = flattenObject(value);
+};
+
+var flattenObject = function flattenObject(object) {
+  if (typeof object !== 'object' || object === null) {
+    return object;
+  }
+
+  var flatObject = {};
+
+  for (var key in object) {
+    flattenObjectCopyValue(flatObject, object, key);
+  }
+
+  for (var _key in Object.getOwnPropertyNames(object)) {
+    flattenObjectCopyValue(flatObject, object, _key);
+  }
+
+  return flatObject;
+};
+
+var AutoScaledCanvas = function () {
+  function AutoScaledCanvas(element) {
+    _classCallCheck(this, AutoScaledCanvas);
+
+    this.element = element;
+  }
+
+  _createClass(AutoScaledCanvas, [{
+    key: "toDataURL",
+    value: function toDataURL() {
+      var _this$element;
+
+      return (_this$element = this.element).toDataURL.apply(_this$element, arguments);
+    }
+  }, {
+    key: "autoScale",
+    value: function autoScale() {
+      if (this.savedHeight !== undefined) {
+        this.element.height = this.savedHeight;
+      }
+
+      if (this.savedWidth !== undefined) {
+        this.element.width = this.savedWidth;
+      }
+
+      window.autoScaleCanvas(this.element);
+    }
+  }, {
+    key: "width",
+    get: function get() {
+      return this.element.width;
+    },
+    set: function set(value) {
+      this.savedWidth = value;
+      this.autoScale();
+      return value;
+    }
+  }, {
+    key: "height",
+    get: function get() {
+      return this.element.height;
+    },
+    set: function set(value) {
+      this.savedHeight = value;
+      this.autoScale();
+      return value;
+    }
+  }]);
+
+  return AutoScaledCanvas;
+}();
+
+var toMessage = function toMessage(result) {
+  if (result instanceof Blob) {
+    return {
+      type: 'blob',
+      payload: btoa(result),
+      meta: {}
+    };
+  }
+
+  if (result instanceof Object) {
+    if (!result[WEBVIEW_TARGET]) {
+      var id = ID();
+      result[WEBVIEW_TARGET] = id;
+      targets[id] = result;
+    }
+
+    return {
+      type: 'json',
+      payload: flattenObject(result),
+      args: toArgs(flattenObject(result)),
+      meta: {
+        target: result[WEBVIEW_TARGET],
+        constructor: result.__constructorName__ || result.constructor.name
+      }
+    };
+  }
+
+  return {
+    type: 'json',
+    payload: JSON.stringify(result),
+    meta: {}
+  };
+};
+
+var toArgs = function toArgs(result) {
+  var args = [];
+
+  for (var key in result) {
+    if (result[key] !== undefined && key !== '@@WEBVIEW_TARGET') {
+      if (typedArrays[result[key].constructor.name] !== undefined) {
+        result[key] = Array.from(result[key]);
+      }
+
+      args.push(result[key]);
+    }
+  }
+
+  return args;
+};
+
+var createObjectsFromArgs = function createObjectsFromArgs(args) {
+  for (var index = 0; index < args.length; index += 1) {
+    var currentArg = args[index];
+
+    if (currentArg && currentArg.className !== undefined) {
+      var className = currentArg.className,
+          classArgs = currentArg.classArgs;
+
+      var object = _construct(constructors[className], _toConsumableArray(classArgs));
+
+      args[index] = object;
+    }
+  }
+
+  return args;
+};
+
+var print = function print() {
+  for (var _len = arguments.length, args = new Array(_len), _key2 = 0; _key2 < _len; _key2++) {
+    args[_key2] = arguments[_key2];
+  }
+
+  var message = JSON.stringify({
+    type: 'log',
+    payload: args
+  });
+  window.ReactNativeWebView.postMessage(message);
+};
+
+var canvas = document.createElement('canvas');
+var autoScaledCanvas = new AutoScaledCanvas(canvas);
+var targets = {
+  canvas: autoScaledCanvas,
+  context2D: canvas.getContext('2d')
+};
+var constructors = {
+  Image: Image,
+  Path2D: Path2D,
+  CanvasGradient: CanvasGradient,
+  ImageData: ImageData,
+  Uint8ClampedArray: Uint8ClampedArray
+};
+var typedArrays = {
+  Uint8ClampedArray: Uint8ClampedArray
+};
+
+Image.bind = Image.bind || function () {
+  return Image;
+};
+
+Path2D.bind = Path2D.bind || function () {
+  return Path2D;
+};
+
+ImageData.bind = ImageData.bind || function () {
+  return ImageData;
+};
+
+Uint8ClampedArray.bind = Uint8ClampedArray.bind || function () {
+  return Uint8ClampedArray;
+};
+
+var populateRefs = function populateRefs(arg) {
+  if (arg && arg.__ref__) {
+    return targets[arg.__ref__];
+  }
+
+  return arg;
+};
+
+document.body.appendChild(canvas);
+
+function handleMessage(_ref) {
+  var id = _ref.id,
+      type = _ref.type,
+      payload = _ref.payload;
+
+  switch (type) {
+    case 'exec':
+      {
+        var _targets$target;
+
+        var target = payload.target,
+            method = payload.method,
+            args = payload.args;
+
+        var result = (_targets$target = targets[target])[method].apply(_targets$target, _toConsumableArray(args.map(populateRefs)));
+
+        var message = toMessage(result);
+
+        if (typeof result === 'object' && !message.meta.constructor) {
+          for (var constructorName in constructors) {
+            if (result instanceof constructors[constructorName]) {
+              message.meta.constructor = constructorName;
+            }
+          }
+        }
+
+        window.ReactNativeWebView.postMessage(JSON.stringify(_objectSpread({
+          id: id
+        }, message)));
+        break;
+      }
+
+    case 'set':
+      {
+        var _target = payload.target,
+            key = payload.key,
+            value = payload.value;
+        targets[_target][key] = populateRefs(value);
+        break;
+      }
+
+    case 'construct':
+      {
+        var _constructor = payload.constructor,
+            _target2 = payload.id,
+            _payload$args = payload.args,
+            _args = _payload$args === void 0 ? [] : _payload$args;
+
+        var newArgs = createObjectsFromArgs(_args);
+        var object;
+
+        try {
+          object = _construct(constructors[_constructor], _toConsumableArray(newArgs));
+        } catch (error) {
+          throw new Error("Error while constructing " + _constructor + " " + error.message);
+        }
+
+        object.__constructorName__ = _constructor;
+
+        var _message = toMessage({});
+
+        targets[_target2] = object;
+        window.ReactNativeWebView.postMessage(JSON.stringify(_objectSpread({
+          id: id
+        }, _message)));
+        break;
+      }
+
+    case 'listen':
+      {
+        var _ret = function () {
+          var types = payload.types,
+              target = payload.target;
+
+          for (var _iterator = types, _isArray = Array.isArray(_iterator), _i = 0, _iterator = _isArray ? _iterator : _iterator[typeof Symbol === "function" ? Symbol.iterator : "@@iterator"]();;) {
+            var _ref2;
+
+            if (_isArray) {
+              if (_i >= _iterator.length) break;
+              _ref2 = _iterator[_i++];
+            } else {
+              _i = _iterator.next();
+              if (_i.done) break;
+              _ref2 = _i.value;
+            }
+
+            var _eventType = _ref2;
+            targets[target].addEventListener(_eventType, function (e) {
+              var message = toMessage({
+                type: 'event',
+                payload: {
+                  type: e.type,
+                  target: _objectSpread({}, flattenObject(targets[target]), _defineProperty({}, WEBVIEW_TARGET, target))
+                }
+              });
+              window.ReactNativeWebView.postMessage(JSON.stringify(_objectSpread({
+                id: id
+              }, message)));
+            });
+          }
+
+          return "break";
+        }();
+
+        if (_ret === "break") break;
+      }
+  }
+}
+
+var handleError = function handleError(err, message) {
+  window.ReactNativeWebView.postMessage(JSON.stringify({
+    id: message.id,
+    type: 'error',
+    payload: {
+      message: err.message,
+      stack: err.stack
+    }
+  }));
+  document.removeEventListener('message', handleIncomingMessage);
+};
+
+function handleIncomingMessage(e) {
+  var data = JSON.parse(e.data);
+
+  if (Array.isArray(data)) {
+    for (var _iterator2 = data, _isArray2 = Array.isArray(_iterator2), _i2 = 0, _iterator2 = _isArray2 ? _iterator2 : _iterator2[typeof Symbol === "function" ? Symbol.iterator : "@@iterator"]();;) {
+      var _ref3;
+
+      if (_isArray2) {
+        if (_i2 >= _iterator2.length) break;
+        _ref3 = _iterator2[_i2++];
+      } else {
+        _i2 = _iterator2.next();
+        if (_i2.done) break;
+        _ref3 = _i2.value;
+      }
+
+      var _message2 = _ref3;
+
+      try {
+        handleMessage(_message2);
+      } catch (err) {
+        handleError(err, _message2);
+      }
+    }
+  } else {
+    try {
+      handleMessage(data);
+    } catch (err) {
+      handleError(err, data);
+    }
+  }
+}
+
+window.addEventListener('message', handleIncomingMessage);
+document.addEventListener('message', handleIncomingMessage);</script>
+  
+
+</body></html>`
+
+var index_html$1 = Object.freeze({
+	default: index_html
+});
+
+var Image_1 = createCommonjsModule(function (module, exports) {
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Canvas = _interopRequireDefault(Canvas_1);
+
+
+
+var _dec, _dec2, _dec3, _class;
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Image = (_dec = (0, webviewBinders.webviewProperties)({
+  crossOrigin: undefined,
+  height: undefined,
+  src: undefined,
+  width: undefined
+}), _dec2 = (0, webviewBinders.webviewEvents)(['load', 'error']), _dec3 = (0, webviewBinders.webviewConstructor)('Image'), _dec(_class = _dec2(_class = _dec3(_class = function Image(canvas, width, height, noOnConstruction) {
+  var _this = this;
+
+  _classCallCheck(this, Image);
+
+  this.postMessage = function (message) {
+    return _this.canvas.postMessage(message);
+  };
+
+  this.addMessageListener = function (listener) {
+    return _this.canvas.addMessageListener(listener);
+  };
+
+  if (!(canvas instanceof _Canvas.default)) {
+    throw new Error('Image must be initialized with a Canvas instance');
+  }
+
+  this.canvas = canvas;
+
+  if (this.onConstruction && !noOnConstruction) {
+    this.onConstruction();
+  }
+
+  if (this.width) {
+    this.width = width;
+  }
+
+  if (this.height) {
+    this.height = height;
+  }
+}) || _class) || _class) || _class);
+exports.default = Image;
+});
+
+unwrapExports(Image_1);
+
+var ImageData_1 = createCommonjsModule(function (module, exports) {
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Canvas = _interopRequireDefault(Canvas_1);
+
+
+
+var _dec, _class;
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var ImageData = (_dec = (0, webviewBinders.webviewConstructor)('ImageData'), _dec(_class = function ImageData(canvas, array, width, height, noOnConstruction) {
+  var _this = this;
+
+  _classCallCheck(this, ImageData);
+
+  this.postMessage = function (message) {
+    return _this.canvas.postMessage(message);
+  };
+
+  this.addMessageListener = function (listener) {
+    return _this.canvas.addMessageListener(listener);
+  };
+
+  if (!(canvas instanceof _Canvas.default)) {
+    throw new Error('ImageData must be initialized with a Canvas instance');
+  }
+
+  this.canvas = canvas;
+
+  if (this.onConstruction && !noOnConstruction) {
+    this.onConstruction(array, width, height);
+  }
+}) || _class);
+exports.default = ImageData;
+});
+
+unwrapExports(ImageData_1);
+
+var Path2D_1 = createCommonjsModule(function (module, exports) {
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+
+
+var _dec, _dec2, _class;
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Path2D = (_dec = (0, webviewBinders.webviewMethods)(['addPath', 'closePath', 'moveTo', 'lineTo', 'bezierCurveTo', 'quadraticCurveTo', 'arc', 'arcTo', 'ellipse', 'rect']), _dec2 = (0, webviewBinders.webviewConstructor)('Path2D'), _dec(_class = _dec2(_class = function Path2D(canvas, pathOrD, noOnConstruction) {
+  var _this = this;
+
+  _classCallCheck(this, Path2D);
+
+  this.postMessage = function (message) {
+    return _this.canvas.postMessage(message);
+  };
+
+  this.addMessageListener = function (listener) {
+    return _this.canvas.addMessageListener(listener);
+  };
+
+  this.canvas = canvas;
+
+  if (this.onConstruction && !noOnConstruction) {
+    this.onConstruction(pathOrD);
+  }
+}) || _class) || _class);
+exports.default = Path2D;
+});
+
+unwrapExports(Path2D_1);
+
+var CanvasGradient_1 = createCommonjsModule(function (module, exports) {
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+
+
+var _dec, _dec2, _class;
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var CanvasGradient = (_dec = (0, webviewBinders.webviewMethods)(['addColorStop']), _dec2 = (0, webviewBinders.webviewConstructor)('CanvasGradient'), _dec(_class = _dec2(_class = function CanvasGradient(canvas) {
+  var _this = this;
+
+  _classCallCheck(this, CanvasGradient);
+
+  this.postMessage = function (message) {
+    return _this.canvas.postMessage(message);
+  };
+
+  this.canvas = canvas;
+}) || _class) || _class);
+exports.default = CanvasGradient;
+});
+
+unwrapExports(CanvasGradient_1);
+
+var require$$4 = ( index_html$1 && index_html ) || index_html$1;
+
+var Canvas_1 = createCommonjsModule(function (module, exports) {
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+Object.defineProperty(exports, "Image", {
+  enumerable: true,
+  get: function get() {
+    return _Image.default;
+  }
+});
+Object.defineProperty(exports, "ImageData", {
+  enumerable: true,
+  get: function get() {
+    return _ImageData.default;
+  }
+});
+Object.defineProperty(exports, "Path2D", {
+  enumerable: true,
+  get: function get() {
+    return _Path2D.default;
+  }
+});
+exports.default = void 0;
+
+var _react = _interopRequireWildcard(react__default);
+
+var _propTypes = _interopRequireDefault(propTypes);
+
+
+
+
+
+var _Bus = _interopRequireDefault(Bus_1);
+
+
+
+var _CanvasRenderingContext2D = _interopRequireDefault(CanvasRenderingContext2D_1);
+
+var _indexHtml = _interopRequireDefault(require$$4);
+
+var _Image = _interopRequireDefault(Image_1);
+
+var _ImageData = _interopRequireDefault(ImageData_1);
+
+var _Path2D = _interopRequireDefault(Path2D_1);
+
+
+
+var _dec,
+    _dec2,
+    _dec3,
+    _class,
+    _class2,
+    _temp,
+    _jsxFileName = "src/Canvas.js";
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = Object.defineProperty && Object.getOwnPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : {}; if (desc.get || desc.set) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } } newObj.default = obj; return newObj; } }
+
+function _extends() { _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; }; return _extends.apply(this, arguments); }
+
+function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _nonIterableSpread(); }
+
+function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance"); }
+
+function _iterableToArray(iter) { if ((typeof Symbol === "function" ? Symbol.iterator : "@@iterator") in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter); }
+
+function _arrayWithoutHoles(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = new Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i] != null ? arguments[i] : {}; var ownKeys = Object.keys(source); if (typeof Object.getOwnPropertySymbols === 'function') { ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) { return Object.getOwnPropertyDescriptor(source, sym).enumerable; })); } ownKeys.forEach(function (key) { _defineProperty(target, key, source[key]); }); } return target; }
+
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } _setPrototypeOf(subClass.prototype, superClass && superClass.prototype); if (superClass) _setPrototypeOf(subClass, superClass); }
+
+function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
+
+function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
+
+function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
+
+function _possibleConstructorReturn(self, call) { if (call && (typeof call === "object" || typeof call === "function")) { return call; } return _assertThisInitialized(self); }
+
+function _getPrototypeOf(o) { _getPrototypeOf = Object.getPrototypeOf || function _getPrototypeOf(o) { return o.__proto__; }; return _getPrototypeOf(o); }
+
+function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+
+var stylesheet = _reactNative.StyleSheet.create({
+  container: {
+    overflow: 'hidden',
+    flex: 0
+  },
+  webview: {
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+    flex: 0
+  },
+  webviewAndroid9: {
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+    flex: 0,
+    opacity: 0.99
+  }
+});
+
+var Canvas = (_dec = (0, webviewBinders.webviewTarget)('canvas'), _dec2 = (0, webviewBinders.webviewProperties)({
+  width: 300,
+  height: 150
+}), _dec3 = (0, webviewBinders.webviewMethods)(['toDataURL']), _dec(_class = _dec2(_class = _dec3(_class = (_temp = _class2 = function (_Component) {
+  function Canvas() {
+    var _this;
+
+    _classCallCheck(this, Canvas);
+
+    _this = _possibleConstructorReturn(this, _getPrototypeOf(Canvas).call(this));
+    _this.state = {
+      isLoaded: false
+    };
+
+    _this.addMessageListener = function (listener) {
+      _this.listeners.push(listener);
+
+      return function () {
+        return _this.removeMessageListener(listener);
+      };
+    };
+
+    _this.removeMessageListener = function (listener) {
+      _this.listeners.splice(_this.listeners.indexOf(listener), 1);
+    };
+
+    _this.webviewPostMessage = function (message) {
+      if (_this.webview) {
+        _this.webview.postMessage(JSON.stringify(message));
+      }
+    };
+
+    _this.bus = new _Bus.default(_this.webviewPostMessage);
+    _this.listeners = [];
+    _this.context2D = new _CanvasRenderingContext2D.default(_assertThisInitialized(_assertThisInitialized(_this)));
+
+    _this.getContext = function (contextType, contextAttributes) {
+      switch (contextType) {
+        case '2d':
+          {
+            return _this.context2D;
+          }
+      }
+
+      return null;
+    };
+
+    _this.postMessage = function _callee(message) {
+      var _ref, stack, _ref2, type, payload, error;
+
+      return regeneratorRuntime.async(function _callee$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              _ref = new Error(), stack = _ref.stack;
+              _context.next = 3;
+              return regeneratorRuntime.awrap(_this.bus.post(_objectSpread({
+                id: Math.random()
+              }, message)));
+
+            case 3:
+              _ref2 = _context.sent;
+              type = _ref2.type;
+              payload = _ref2.payload;
+              _context.t0 = type;
+              _context.next = _context.t0 === 'error' ? 9 : _context.t0 === 'json' ? 12 : _context.t0 === 'blob' ? 13 : 14;
+              break;
+
+            case 9:
+              error = new Error(payload.message);
+              error.stack = stack;
+              throw error;
+
+            case 12:
+              return _context.abrupt("return", payload);
+
+            case 13:
+              return _context.abrupt("return", atob(payload));
+
+            case 14:
+            case "end":
+              return _context.stop();
+          }
+        }
+      }, null, this);
+    };
+
+    _this.handleMessage = function (e) {
+      var data = JSON.parse(e.nativeEvent.data);
+
+      switch (data.type) {
+        case 'log':
+          {
+            var _console;
+
+            (_console = console).log.apply(_console, _toConsumableArray(data.payload));
+
+            break;
+          }
+
+        case 'error':
+          {
+            throw new Error(data.payload.message);
+          }
+
+        default:
+          {
+            if (data.payload) {
+              var _constructor = webviewBinders.constructors[data.meta.constructor];
+
+              if (_constructor) {
+                var _data = data,
+                    args = _data.args,
+                    payload = _data.payload;
+
+                var object = _constructor.constructLocally.apply(_constructor, [_assertThisInitialized(_assertThisInitialized(_this))].concat(_toConsumableArray(args)));
+
+                _extends(object, payload, _defineProperty({}, webviewBinders.WEBVIEW_TARGET, data.meta.target));
+
+                data = _objectSpread({}, data, {
+                  payload: object
+                });
+              }
+
+              for (var _iterator = _this.listeners, _isArray = Array.isArray(_iterator), _i = 0, _iterator = _isArray ? _iterator : _iterator[typeof Symbol === "function" ? typeof Symbol === "function" ? Symbol.iterator : "@@iterator" : "@@iterator"]();;) {
+                var _ref3;
+
+                if (_isArray) {
+                  if (_i >= _iterator.length) break;
+                  _ref3 = _iterator[_i++];
+                } else {
+                  _i = _iterator.next();
+                  if (_i.done) break;
+                  _ref3 = _i.value;
+                }
+
+                var _listener = _ref3;
+
+                _listener(data.payload);
+              }
+            }
+
+            _this.bus.handle(data);
+          }
+      }
+    };
+
+    _this.handleRef = function (element) {
+      _this.webview = element;
+    };
+
+    _this.handleLoad = function () {
+      _this.setState({
+        isLoaded: true
+      });
+
+      _this.bus.resume();
+    };
+
+    _this.bus.pause();
+
+    return _this;
+  }
+
+  _createClass(Canvas, [{
+    key: "render",
+    value: function render() {
+      var width = this.width,
+          height = this.height;
+      var _this$props = this.props,
+          style = _this$props.style,
+          _this$props$baseUrl = _this$props.baseUrl,
+          baseUrl = _this$props$baseUrl === void 0 ? '' : _this$props$baseUrl,
+          _this$props$originWhi = _this$props.originWhitelist,
+          originWhitelist = _this$props$originWhi === void 0 ? ['*'] : _this$props$originWhi;
+      var isLoaded = this.state.isLoaded;
+
+      if (_reactNative.Platform.OS === 'android') {
+        var isAndroid9 = _reactNative.Platform.Version >= 28;
+        return _react.default.createElement(_reactNative.View, {
+          style: [stylesheet.container, {
+            width: width,
+            height: height
+          }, style],
+          __source: {
+            fileName: _jsxFileName,
+            lineNumber: 146
+          }
+        }, _react.default.createElement(_reactNativeWebview.WebView, {
+          ref: this.handleRef,
+          style: [isAndroid9 ? stylesheet.webviewAndroid9 : stylesheet.webview, {
+            height: height,
+            width: width
+          }],
+          source: {
+            html: _indexHtml.default,
+            baseUrl: baseUrl
+          },
+          originWhitelist: originWhitelist,
+          onMessage: this.handleMessage,
+          onLoad: this.handleLoad,
+          mixedContentMode: "always",
+          scalesPageToFit: false,
+          javaScriptEnabled: true,
+          domStorageEnabled: true,
+          thirdPartyCookiesEnabled: true,
+          allowUniversalAccessFromFileURLs: true,
+          __source: {
+            fileName: _jsxFileName,
+            lineNumber: 147
+          }
+        }));
+      }
+
+      return _react.default.createElement(_reactNative.View, {
+        style: [stylesheet.container, {
+          width: width,
+          height: height,
+          opacity: isLoaded ? 1 : 0
+        }, style],
+        __source: {
+          fileName: _jsxFileName,
+          lineNumber: 165
+        }
+      }, _react.default.createElement(_reactNativeWebview.WebView, {
+        ref: this.handleRef,
+        style: [stylesheet.webview, {
+          height: height,
+          width: width
+        }],
+        source: {
+          html: _indexHtml.default,
+          baseUrl: baseUrl
+        },
+        originWhitelist: originWhitelist,
+        onMessage: this.handleMessage,
+        onLoad: this.handleLoad,
+        scrollEnabled: false,
+        __source: {
+          fileName: _jsxFileName,
+          lineNumber: 166
+        }
+      }));
+    }
+  }]);
+
+  _inherits(Canvas, _Component);
+
+  return Canvas;
+}(_react.Component), _class2.propTypes = {
+  style: _reactNative.ViewPropTypes.style,
+  baseUrl: _propTypes.default.string,
+  originWhitelist: _propTypes.default.arrayOf(_propTypes.default.string)
+}, _temp)) || _class) || _class) || _class);
+exports.default = Canvas;
+});
+
+var Canvas = unwrapExports(Canvas_1);
+
 var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
   return typeof obj;
 } : function (obj) {
@@ -6861,7 +8601,7 @@ var Globe$1 = function (_Component) {
         backgroundColor: backgroundColor
       };
 
-      return React__default.createElement(
+      return react__default.createElement(
         Canvas,
         { id: this.canvasId, style: style },
         'Your browser does not support HTML5 Canvas.'
@@ -6928,7 +8668,7 @@ var Globe$1 = function (_Component) {
     }
   }]);
   return Globe$$1;
-}(React.Component);
+}(react.Component);
 
 Globe$1.propTypes = {
   /**
