@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2018 Bruce Schubert.
  * The MIT License
  * http://www.opensource.org/licenses/mit-license
@@ -7,7 +7,8 @@ import React, {Component} from 'react';
 import PropTypes from 'prop-types';
 import 'worldwindjs'; // WorldWind
 import { observable } from "mobx";
- 
+
+import Canvas from 'react-native-canvas';
 import WorldWindFixes from '../api/WorldWindFixes';
 import EoxOpenStreetMapLayer from '../api/EoxOpenStreetMapLayer';
 import EoxSentinal2CloudlessLayer from '../api/EoxSentinal2CloudlessLayer';
@@ -59,7 +60,7 @@ export default class Globe extends Component {
   }
 
   static propTypes = {
-    /** 
+    /**
      * An array of layer type strings, WorldWind.Layer objects, and/or layer
      * configuration objects, e.g., {layer: String|WorldWind.Layer, options: Object}
      */
@@ -76,20 +77,20 @@ export default class Globe extends Component {
      * Altitude in meters above sea level (MSL)
      */
     altitude: PropTypes.number,
-    /** 
-     * A projection identifier string 
+    /**
+     * A projection identifier string
      */
     projection: PropTypes.string,
     /**
      * Background color CSS string
      */
     backgroundColor: PropTypes.string,
-    /** 
-     * The id of an existing canvas to attach the Globe 
+    /**
+     * The id of an existing canvas to attach the Globe
      */
     canvasId: PropTypes.string,
-    /** 
-     * A callback function to push state up to the parent 
+    /**
+     * A callback function to push state up to the parent
      */
     onUpdate: PropTypes.func
   }
@@ -108,8 +109,8 @@ export default class Globe extends Component {
   }
 
   /**
-   * Predefined layer types used by addLayer(). An application is free to change 
-   * the values but not the keys. The values are used for the default 
+   * Predefined layer types used by addLayer(). An application is free to change
+   * the values but not the keys. The values are used for the default
    * layer display names.
    */
   static get layerTypes() {
@@ -160,7 +161,7 @@ export default class Globe extends Component {
   static isBaseUrlSet = false;
 
   /**
-   * Add a layer to the globe and applies options object properties to the 
+   * Add a layer to the globe and applies options object properties to the
    * the layer.
    * @param {WorldWind.Layer|String} layer A layer object or a Globe.layerTypes key or value
    * @param {Object|null} options E.g., {category: "base", enabled: true}
@@ -187,7 +188,7 @@ export default class Globe extends Component {
       }
     }
 
-    // Assign a default category property for layer management 
+    // Assign a default category property for layer management
     if (typeof wwLayer.category === 'undefined') {
       wwLayer.category = 'base'; // default category
     }
@@ -204,7 +205,7 @@ export default class Globe extends Component {
       }
     }
 
-    // Assign a unique layer ID for layer management 
+    // Assign a unique layer ID for layer management
     wwLayer.uniqueId = this.nextLayerId++;
 
     // Add the layer to the end of the layers within the category
@@ -226,10 +227,10 @@ export default class Globe extends Component {
   }
 
   /**
-   * Creates a layer based on a layerType key or value. Layer type keys must be 
-   * an exact match; partial strings may be used for layer type values. 
+   * Creates a layer based on a layerType key or value. Layer type keys must be
+   * an exact match; partial strings may be used for layer type values.
    * @param {String} layerType A Globe.layerTypes key or value
-   * @returns {WorldWind.Layer|null}  
+   * @returns {WorldWind.Layer|null}
    */
   createLayer(layerType) {
     let type = null;
@@ -301,7 +302,7 @@ export default class Globe extends Component {
         break;
       case 'view-controls':
         layer = new WorldWind.ViewControlsLayer(this.wwd);
-        // Override the default placement to allow room for credits 
+        // Override the default placement to allow room for credits
         layer.placement = new WorldWind.Offset(WorldWind.OFFSET_PIXELS, 11, WorldWind.OFFSET_PIXELS, 11);
         layer.showPanControl = false;
         layer.showHeadingControl = true;
@@ -391,7 +392,7 @@ export default class Globe extends Component {
     /**
      * Returns an observable containing the last update timestamp for the category.
      * @param {String} category
-     * @returns {Observable} 
+     * @returns {Observable}
      */
     getCategoryTimestamp(category) {
         if (!this.categoryTimestamps.has(category)) {
@@ -447,7 +448,7 @@ export default class Globe extends Component {
   }
 
   /**
-   * Arms the click-drop handler with the given callback. The callback will be invoked with the 
+   * Arms the click-drop handler with the given callback. The callback will be invoked with the
    * terrain position where the globe is next clicked or tapped.
    */
   armClickDrop(dropCallback) {
@@ -481,7 +482,7 @@ export default class Globe extends Component {
       default:
     }
     if (this.dropCallback) {
-      // Get all the picked items 
+      // Get all the picked items
       const pickList = this.wwd.pickTerrain(this.wwd.canvasCoordinates(x, y));
       // Terrain should be one of the items if the globe was clicked
       const terrain = pickList.terrainObject();
@@ -593,7 +594,7 @@ export default class Globe extends Component {
       });
     }
 
-    // Change the startup position if given 
+    // Change the startup position if given
     if (this.props.latitude && this.props.longitude) {
       this.lookAt(this.props.latitude, this.props.longitude, this.props.altitude)
     }
@@ -626,9 +627,9 @@ export default class Globe extends Component {
     };
 
     return(
-      <canvas id={this.canvasId} style={style}>
+      <Canvas id={this.canvasId} style={style}>
           Your browser does not support HTML5 Canvas.
-      </canvas>
+      </Canvas>
       );
   }
 };

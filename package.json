@@ -1,5 +1,5 @@
 {
-  "name": "worldwind-react-globe",
+  "name": "worldwind-react-native",
   "version": "1.2.0",
   "description": "An interactive globe for React featuring maps, imagery and terrain plus 2D map projections using the WorldWindJS community supported Web WorldWind virtual globe SDK.",
   "private": false,
@@ -19,13 +19,13 @@
     "nasa",
     "esa"
   ],
-  "homepage": "https://emxsys.github.io/worldwind-react-globe",
-  "bugs": "https://github.com/emxsys/worldwind-react-globe/issues",
+  "homepage": "https://github.com/christophedebatz/worldwind-react-globe",
+  "bugs": "https://github.com/christophedebatz/worldwind-react-globe/issues",
   "author": "Bruce Schubert",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/emxsys/worldwind-react-globe.git"
+    "url": "https://github.com/christophedebatz/worldwind-react-globe"
   },
   "main": "dist/index.js",
   "module": "dist/index.es.js",
@@ -40,15 +40,16 @@
     "deploy": "gh-pages -d example/build"
   },
   "dependencies": {
-    "worldwindjs": "^1.7.0"
-  },
-  "peerDependencies": {
+    "react-native-webview": "^10.10.2",
+    "worldwindjs": "^1.7.0",
     "jquery": "^3.3.1",
-    "prop-types": "^15.5.4",
     "mobx": "^4.2.1",
     "mobx-react": "^5.1.2",
-    "react": "^15.0.0 || ^16.0.0",
-    "react-dom": "^15.0.0 || ^16.0.0"
+    "prop-types": "^15.5.4"
+  },
+  "peerDependencies": {
+    "react": "^16.0.0",
+    "react-dom": "^16.0.0"
   },
   "devDependencies": {
     "babel-core": "^6.26.0",
